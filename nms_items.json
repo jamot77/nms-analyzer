@@ -1,0 +1,98 @@
+{
+  "__KOMENTARZ__": "BAZA DANYCH NO MANS SKY - MVP",
+
+  "CARBON": {
+    "type": "Zasób podstawowy",
+    "action": "TRZYMAJ",
+    "tip": "Niezbędny do ładowania Multi-toola. Zawsze miej zapas."
+  },
+  "CONDENSED CARBON": {
+    "type": "Zasób podstawowy",
+    "action": "TRZYMAJ",
+    "tip": "Wydajniejsze paliwo niż zwykły węgiel."
+  },
+  "FERRITE DUST": {
+    "type": "Budulec",
+    "action": "TRZYMAJ",
+    "tip": "Podstawa budowania baz i części terenu."
+  },
+  "PURE FERRITE": {
+    "type": "Budulec",
+    "action": "TRZYMAJ",
+    "tip": "Potrzebny do bardziej zaawansowanych konstrukcji."
+  },
+  "SODIUM": {
+    "type": "Ochrona",
+    "action": "TRZYMAJ",
+    "tip": "Ładowanie tarcz statku i ochrony termicznej."
+  },
+  "OXYGEN": {
+    "type": "Podtrzymywanie życia",
+    "action": "TRZYMAJ",
+    "tip": "Kluczowy do przeżycia. Można też rafinować w węgiel."
+  },
+  "DI-HYDROGEN JELLY": {
+    "type": "Paliwo",
+    "action": "RAFINUJ",
+    "tip": "Włóż do rafinerii, by odzyskać 50 Di-Hydrogen (szybsze niż zbieranie)."
+  },
+  
+  "SALVAGED DATA": {
+    "type": "Waluta",
+    "action": "TRZYMAJ",
+    "tip": "Wymień w Anomalii na nowe technologie. Po wykupieniu wszystkiego - sprzedaj."
+  },
+  "NAVIGATIONAL DATA": {
+    "type": "Waluta",
+    "action": "WYMIEŃ/SPRZEDAJ",
+    "tip": "Wymień na mapy u kartografa na stacji kosmicznej."
+  },
+  
+  "RUSTED METAL": {
+    "type": "Opad",
+    "action": "RAFINUJ",
+    "tip": "Nie wyrzucaj! Rafinuje się w Ferrite Dust (stosunek 1:2)."
+  },
+  "LIVING SLIME": {
+    "type": "Opad biologiczny",
+    "action": "RAFINUJ",
+    "tip": "Rafinuj wielokrotnie (Slime -> Mold -> Nanites). Źródło Nanitów!"
+  },
+  "RESIDUAL GOOP": {
+    "type": "Opad biologiczny",
+    "action": "RAFINUJ",
+    "tip": "Pierwszy etap rafinacji w Nanity. Długi proces, ale opłacalny."
+  },
+  
+  "GECK RELIC": {
+    "type": "Artefakt",
+    "action": "UŻYJ/SPRZEDAJ",
+    "tip": "Podaruj Gekowi dla reputacji lub sprzedaj."
+  },
+  "VY'KEEN EFFIGY": {
+    "type": "Artefakt",
+    "action": "UŻYJ/SPRZEDAJ",
+    "tip": "Podaruj Vy'keenowi dla reputacji lub sprzedaj."
+  },
+  "KORVAX CASING": {
+    "type": "Artefakt",
+    "action": "UŻYJ/SPRZEDAJ",
+    "tip": "Podaruj Korvaxowi dla reputacji lub sprzedaj."
+  },
+  
+  "ALBUMEN PEARL": {
+    "type": "Towar handlowy",
+    "action": "SPRZEDAJ",
+    "tip": "Służy głównie do zarabiania Units."
+  },
+  "GRAVITINO BALL": {
+    "type": "Towar handlowy",
+    "action": "SPRZEDAJ",
+    "tip": "Wysoka wartość sprzedaży. Uważaj na strażników przy zbieraniu!"
+  },
+  "STASIS DEVICE": {
+    "type": "High-End Crafting",
+    "action": "SPRZEDAJ",
+    "tip": "Jeden z najdroższych przedmiotów w grze (15 mln+). Tylko na sprzedaż."
+  }
+}

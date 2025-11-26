@@ -12,13 +12,13 @@ SPACING = 13
 GRID_COLS = 8
 GRID_ROWS = 6
 
-# RADYKALNE PRZESUNIĘCIE W GÓRĘ I W LEWO:
-START_X = 20  # Było 50 - Przesuwamy o 30 pikseli w lewo!
-START_Y = 220 # Było 265 - Przesuwamy o 45 pikseli w górę!
+# Wracamy do stabilnego punktu startowego siatki Cargo (pod nagłówkiem)
+START_X = 50 
+START_Y = 265 
 
-# ROI (Region of Interest) dla symbolu
-SYMBOL_ROI_OFFSET_X = 10 
-SYMBOL_ROI_OFFSET_Y = 10 
+# Zwiększamy offset, aby wycelować w środek symbolu
+SYMBOL_ROI_OFFSET_X = 15 # Było 10 - Celujemy w prawo
+SYMBOL_ROI_OFFSET_Y = 15 # Było 10 - Celujemy w dół
 SYMBOL_ROI_SIZE = 25
 
 # Baza symboli do konwersji (Musi pasować do kluczy z nms_items.json)

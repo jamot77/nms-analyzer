@@ -1,98 +1,37 @@
 {
-  "__KOMENTARZ__": "BAZA DANYCH NO MANS SKY - MVP",
-
   "CARBON": {
     "type": "Zasób podstawowy",
     "action": "TRZYMAJ",
-    "tip": "Niezbędny do ładowania Multi-toola. Zawsze miej zapas."
-  },
-  "CONDENSED CARBON": {
-    "type": "Zasób podstawowy",
-    "action": "TRZYMAJ",
-    "tip": "Wydajniejsze paliwo niż zwykły węgiel."
-  },
-  "FERRITE DUST": {
-    "type": "Budulec",
-    "action": "TRZYMAJ",
-    "tip": "Podstawa budowania baz i części terenu."
-  },
-  "PURE FERRITE": {
-    "type": "Budulec",
-    "action": "TRZYMAJ",
-    "tip": "Potrzebny do bardziej zaawansowanych konstrukcji."
+    "tip": "Podstawowy budulec, niezbędny do ładowania narzędzia górniczego. Wartość niewielka."
   },
   "SODIUM": {
-    "type": "Ochrona",
+    "type": "Zasób podstawowy",
     "action": "TRZYMAJ",
-    "tip": "Ładowanie tarcz statku i ochrony termicznej."
+    "tip": "Ładuje system ochrony środowiska Exosuit. Zawsze miej go przy sobie."
+  },
+  "FERRITE DUST": {
+    "type": "Zasób podstawowy",
+    "action": "TRZYMAJ",
+    "tip": "Niezbędny do budowania i naprawy statku. Łatwo dostępny, ale ważny."
+  },
+  "PURE FERRITE": {
+    "type": "Zasób rafinowany",
+    "action": "HANDEL/TRZYMAJ",
+    "tip": "Używany do zaawansowanych konstrukcji statków i baz. Sprzedawaj nadmiar."
   },
   "OXYGEN": {
-    "type": "Podtrzymywanie życia",
+    "type": "Zasób podstawowy",
     "action": "TRZYMAJ",
-    "tip": "Kluczowy do przeżycia. Można też rafinować w węgiel."
+    "tip": "Niezbędny do podtrzymywania życia i rafinacji. Zawsze miej go dużo."
   },
-  "DI-HYDROGEN JELLY": {
-    "type": "Paliwo",
-    "action": "RAFINUJ",
-    "tip": "Włóż do rafinerii, by odzyskać 50 Di-Hydrogen (szybsze niż zbieranie)."
+  "CONDENSED OXYGEN": {
+    "type": "Zasób rafinowany",
+    "action": "HANDEL/TRZYMAJ",
+    "tip": "Silnie skoncentrowany tlen. Sprzedaj, jeśli masz dużo, lub używaj w rafinerii."
   },
-  
-  "SALVAGED DATA": {
-    "type": "Waluta",
-    "action": "TRZYMAJ",
-    "tip": "Wymień w Anomalii na nowe technologie. Po wykupieniu wszystkiego - sprzedaj."
-  },
-  "NAVIGATIONAL DATA": {
-    "type": "Waluta",
-    "action": "WYMIEŃ/SPRZEDAJ",
-    "tip": "Wymień na mapy u kartografa na stacji kosmicznej."
-  },
-  
-  "RUSTED METAL": {
-    "type": "Opad",
-    "action": "RAFINUJ",
-    "tip": "Nie wyrzucaj! Rafinuje się w Ferrite Dust (stosunek 1:2)."
-  },
-  "LIVING SLIME": {
-    "type": "Opad biologiczny",
-    "action": "RAFINUJ",
-    "tip": "Rafinuj wielokrotnie (Slime -> Mold -> Nanites). Źródło Nanitów!"
-  },
-  "RESIDUAL GOOP": {
-    "type": "Opad biologiczny",
-    "action": "RAFINUJ",
-    "tip": "Pierwszy etap rafinacji w Nanity. Długi proces, ale opłacalny."
-  },
-  
-  "GECK RELIC": {
-    "type": "Artefakt",
-    "action": "UŻYJ/SPRZEDAJ",
-    "tip": "Podaruj Gekowi dla reputacji lub sprzedaj."
-  },
-  "VY'KEEN EFFIGY": {
-    "type": "Artefakt",
-    "action": "UŻYJ/SPRZEDAJ",
-    "tip": "Podaruj Vy'keenowi dla reputacji lub sprzedaj."
-  },
-  "KORVAX CASING": {
-    "type": "Artefakt",
-    "action": "UŻYJ/SPRZEDAJ",
-    "tip": "Podaruj Korvaxowi dla reputacji lub sprzedaj."
-  },
-  
-  "ALBUMEN PEARL": {
-    "type": "Towar handlowy",
-    "action": "SPRZEDAJ",
-    "tip": "Służy głównie do zarabiania Units."
-  },
-  "GRAVITINO BALL": {
-    "type": "Towar handlowy",
-    "action": "SPRZEDAJ",
-    "tip": "Wysoka wartość sprzedaży. Uważaj na strażników przy zbieraniu!"
-  },
-  "STASIS DEVICE": {
-    "type": "High-End Crafting",
-    "action": "SPRZEDAJ",
-    "tip": "Jeden z najdroższych przedmiotów w grze (15 mln+). Tylko na sprzedaż."
+  "DI-SODIUM": {
+    "type": "Zasób rafinowany",
+    "action": "HANDEL/TRZYMAJ",
+    "tip": "Silnie skoncentrowany sód. Wartość wyższa niż zwykły sód."
   }
 }

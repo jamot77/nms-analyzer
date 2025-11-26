@@ -6,10 +6,7 @@ import json
 from fuzzywuzzy import process
 from PIL import Image
 
-# Konfiguracja strony
 st.set_page_config(page_title="NMS Inventory Analyzer", page_icon="🚀")
-
-# --- FUNKCJE ---
 
 @st.cache_data
 def load_db():
@@ -17,93 +14,105 @@ def load_db():
         with open('nms_items.json', 'r', encoding='utf-8') as f:
             return json.load(f)
     except FileNotFoundError:
-        st.error("Błąd: Nie znaleziono pliku nms_items.json!")
         return {}
 
 def process_image(pil_image):
-    # POPRAWKA: Konwersja bezpośrednio z obrazu PIL na format OpenCV (NumPy array)
-    # Dzięki temu nie musimy czytać pliku drugi raz
+    # 1. Konwersja PIL -> OpenCV
     img_array = np.array(pil_image)
-    
-    # PIL używa RGB, OpenCV domyślnie BGR, ale my i tak robimy szarość
-    # więc używamy COLOR_RGB2GRAY
-    if len(img_array.shape) == 3: # Jeśli obraz jest kolorowy
-        gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
-    else: # Jeśli obraz już jest czarno-biały
-        gray = img_array
+    if len(img_array.shape) == 3:
+        img = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+    else:
+        img = img_array
 
-    # Zwiększenie kontrastu (Binaryzacja)
-    _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)
+    # 2. POWIĘKSZENIE (Upscaling) - Kluczowe dla małych napisów
+    # Powiększamy obraz 2-krotnie, używając interpolacji sześciennej
+    img = cv2.resize(img, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+
+    # 3. Konwersja na szarość
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    # 4. Odszumianie (Lekki Blur)
+    # Usuwa "ziarno" ze zdjęcia zrobionego telefonem/screena
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+
+    # 5. ADAPTIVE THRESHOLDING (To jest game changer)
+    # Zamiast sztywnego progu, algorytm bada sąsiedztwo pikseli.
+    # Sprawia, że biały tekst na ciemnym tle staje się czarnym tekstem na białym tle.
+    thresh = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+                                   cv2.THRESH_BINARY, 31, 2)
+
+    # 6. OCR
+    # psm 11 (sparse text) lub psm 3 (auto segmentation)
+    # Dodajemy whitelist (opcjonalnie), żeby szukał tylko liter A-Z
+    custom_config = r'--psm 11'
+    text = pytesseract.image_to_string(thresh, config=custom_config)
     
-    # OCR
-    text = pytesseract.image_to_string(thresh, config='--psm 11')
-    return text
+    return text, thresh # Zwracamy też obrazek 'thresh' do podglądu
 
 def analyze_text(raw_text, db):
     results = []
+    # Filtrujemy bardzo krótkie śmieci (mniej niż 4 znaki)
     lines = [line.strip() for line in raw_text.split('\n') if len(line) > 3]
     db_keys = list(db.keys())
     
     for line in lines:
-        # Fuzzy matching - szukamy podobieństwa
-        match, score = process.extractOne(line.upper(), db_keys)
-        # Obniżyłem lekko próg do 75%, bo zdjęcia z TV mogą być mniej wyraźne
-        if score >= 75: 
+        # Usuwamy znaki specjalne, które OCR często dodaje (np. | [ ] { })
+        clean_line = ''.join(e for e in line if e.isalnum() or e.isspace())
+        
+        match, score = process.extractOne(clean_line.upper(), db_keys)
+        
+        # Jeśli wynik jest wysoki, dodajemy
+        if score >= 70: # Lekko obniżony próg dla trudnych screenów
             item_data = db[match]
-            # Sprawdzamy czy nie dodajemy tego samego przedmiotu kilka razy
             if not any(d['Przedmiot'] == match for d in results):
                 results.append({
                     "Przedmiot": match,
                     "Akcja": item_data['action'],
                     "Typ": item_data['type'],
-                    "Rada": item_data['tip']
+                    "Rada": item_data['tip'],
+                    "Oryginał": line # Debug: co zobaczył OCR
                 })
     return results
 
-# --- INTERFEJS (FRONTEND) ---
+# --- FRONTEND ---
 
-st.title("🚀 NMS Inventory Analyzer")
-st.write("Wrzuć screen z PS App, a powiem Ci co sprzedać.")
+st.title("🚀 NMS Inventory Analyzer v2")
+st.write("Wgraj screen z PS App.")
 
-# Wgrywanie pliku
 uploaded_file = st.file_uploader("Wybierz zdjęcie...", type=["jpg", "png", "jpeg"])
 
 if uploaded_file is not None:
-    # 1. Otwieramy obraz raz za pomocą PIL
     image = Image.open(uploaded_file)
+    st.image(image, caption='Oryginał', use_column_width=True)
     
-    # Wyświetlamy obrazek
-    st.image(image, caption='Twój ekwipunek', use_column_width=True)
+    st.write("⚙️ Przetwarzam obraz...")
     
-    st.write("🔍 Analizuję obraz...")
-    
-    # Logika
     database = load_db()
     
-    # POPRAWKA: Przekazujemy otwarty obiekt 'image', a nie plik 'uploaded_file'
-    raw_text = process_image(image)
+    # Pobieramy tekst ORAZ przetworzony obraz
+    raw_text, processed_img = process_image(image)
     
+    # --- DEBUG VIEW ---
+    with st.expander("👁️ Zobacz jak komputer widzi Twój screen (Debug)"):
+        st.write("Jeśli tutaj nie widzisz wyraźnych czarnych liter, OCR też ich nie zobaczy.")
+        st.image(processed_img, caption='Obraz po filtrach', use_column_width=True)
+        st.text("Surowy tekst:")
+        st.text(raw_text)
+    # ------------------
+
     found_items = analyze_text(raw_text, database)
     
-    # Wyniki
     if found_items:
-        st.success(f"Znaleziono {len(found_items)} pasujących przedmiotów!")
-        
+        st.success(f"Znaleziono {len(found_items)} przedmiotów!")
         for item in found_items:
-            # Kolorowanie ramek w zależności od akcji
             color = "green" if item['Akcja'] == "TRZYMAJ" else "red"
-            if "SPRZEDAJ" in item['Akcja'] or "HANDEL" in item['Akcja']: color = "orange"
+            if "SPRZEDAJ" in item['Akcja']: color = "orange"
             
             with st.container():
-                # Używamy markdown do ładnego formatowania
                 st.markdown(f"### :{color}[{item['Akcja']}] {item['Przedmiot']}")
-                st.caption(f"Typ: {item['Typ']}")
+                st.caption(f"Typ: {item['Typ']} (Dopasowano z: '{item['Oryginał']}')")
                 st.info(item['Rada'])
                 st.divider()
     else:
-        st.warning("Nie udało się rozpoznać znanych przedmiotów.")
-        st.info("Wskazówka: Upewnij się, że zdjęcie jest wyraźne, a nazwy przedmiotów są w naszej bazie JSON.")
-
-    # Debug (opcjonalnie)
-    with st.expander("Pokaż surowy tekst z OCR (dla debugowania)"):
-        st.text(raw_text)
+        st.error("Nie znaleziono przedmiotów.")
+        st.info("Spójrz w sekcję 'Debug' powyżej. Jeśli tekst na czarno-białym zdjęciu jest zamazany, spróbuj zrobić screena bliżej lub z innej zakładki ekwipunku.")

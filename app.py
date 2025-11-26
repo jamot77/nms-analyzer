@@ -50,14 +50,13 @@ def load_db():
 def find_symbol_slots(img_cv):
     """
     Krok 1: Wycina i wstępnie przetwarza maleńkie obszary symboli.
+    Dodano weryfikację wizualną ROI.
     """
     symbol_images = []
     
-    # Przetwarzanie całego obrazu: szarość i Adaptive Thresholding
+    # Przetwarzanie całego obrazu: szarość i Binary Thresholding
     img_gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
     blur = cv2.GaussianBlur(img_gray, (3, 3), 0)
-    
-    # Wykorzystujemy prosty Binary Threshold, ponieważ symbole są jasne na ciemnym tle
     _, thresh = cv2.threshold(blur, 100, 255, cv2.THRESH_BINARY) 
     
     for row in range(GRID_ROWS):
@@ -71,8 +70,17 @@ def find_symbol_slots(img_cv):
             # Wycina ROI symbolu
             symbol_img = thresh[y_start:y_end, x_start:x_end]
             
-            # Weryfikacja
+            # Weryfikacja: upewniamy się, że slot został poprawnie wycięty
             if symbol_img.shape[0] == SYMBOL_ROI_SIZE and symbol_img.shape[1] == SYMBOL_ROI_SIZE:
+                
+                # ------ KRYTYCZNY DEBUG WIZUALNY ------
+                # Rysujemy biały krzyżyk na środku wycinanego symbolu, 
+                # aby upewnić się, że w ogóle coś widać w sekcji debugowania.
+                center = SYMBOL_ROI_SIZE // 2
+                cv2.line(symbol_img, (center-5, center), (center+5, center), 255, 1) # Linia pozioma
+                cv2.line(symbol_img, (center, center-5), (center, center+5), 255, 1) # Linia pionowa
+                # --------------------------------------
+
                 symbol_images.append(symbol_img)
             else:
                 symbol_images.append(None) 

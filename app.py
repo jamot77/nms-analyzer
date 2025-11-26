@@ -20,13 +20,19 @@ def load_db():
         st.error("Błąd: Nie znaleziono pliku nms_items.json!")
         return {}
 
-def process_image(image_file):
-    # Konwersja wgranego pliku na format zrozumiały dla OpenCV
-    file_bytes = np.asarray(bytearray(image_file.read()), dtype=np.uint8)
-    img = cv2.imdecode(file_bytes, 1)
+def process_image(pil_image):
+    # POPRAWKA: Konwersja bezpośrednio z obrazu PIL na format OpenCV (NumPy array)
+    # Dzięki temu nie musimy czytać pliku drugi raz
+    img_array = np.array(pil_image)
     
-    # Przetwarzanie obrazu (szarość + kontrast)
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # PIL używa RGB, OpenCV domyślnie BGR, ale my i tak robimy szarość
+    # więc używamy COLOR_RGB2GRAY
+    if len(img_array.shape) == 3: # Jeśli obraz jest kolorowy
+        gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
+    else: # Jeśli obraz już jest czarno-biały
+        gray = img_array
+
+    # Zwiększenie kontrastu (Binaryzacja)
     _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)
     
     # OCR
@@ -41,14 +47,17 @@ def analyze_text(raw_text, db):
     for line in lines:
         # Fuzzy matching - szukamy podobieństwa
         match, score = process.extractOne(line.upper(), db_keys)
-        if score >= 80: # Próg pewności 80%
+        # Obniżyłem lekko próg do 75%, bo zdjęcia z TV mogą być mniej wyraźne
+        if score >= 75: 
             item_data = db[match]
-            results.append({
-                "Przedmiot": match,
-                "Akcja": item_data['action'],
-                "Typ": item_data['type'],
-                "Rada": item_data['tip']
-            })
+            # Sprawdzamy czy nie dodajemy tego samego przedmiotu kilka razy
+            if not any(d['Przedmiot'] == match for d in results):
+                results.append({
+                    "Przedmiot": match,
+                    "Akcja": item_data['action'],
+                    "Typ": item_data['type'],
+                    "Rada": item_data['tip']
+                })
     return results
 
 # --- INTERFEJS (FRONTEND) ---
@@ -60,15 +69,20 @@ st.write("Wrzuć screen z PS App, a powiem Ci co sprzedać.")
 uploaded_file = st.file_uploader("Wybierz zdjęcie...", type=["jpg", "png", "jpeg"])
 
 if uploaded_file is not None:
-    # Wyświetl obrazek (dla pewności)
+    # 1. Otwieramy obraz raz za pomocą PIL
     image = Image.open(uploaded_file)
+    
+    # Wyświetlamy obrazek
     st.image(image, caption='Twój ekwipunek', use_column_width=True)
     
     st.write("🔍 Analizuję obraz...")
     
     # Logika
     database = load_db()
-    raw_text = process_image(uploaded_file)
+    
+    # POPRAWKA: Przekazujemy otwarty obiekt 'image', a nie plik 'uploaded_file'
+    raw_text = process_image(image)
+    
     found_items = analyze_text(raw_text, database)
     
     # Wyniki
@@ -78,16 +92,18 @@ if uploaded_file is not None:
         for item in found_items:
             # Kolorowanie ramek w zależności od akcji
             color = "green" if item['Akcja'] == "TRZYMAJ" else "red"
-            if "SPRZEDAJ" in item['Akcja']: color = "orange"
+            if "SPRZEDAJ" in item['Akcja'] or "HANDEL" in item['Akcja']: color = "orange"
             
             with st.container():
+                # Używamy markdown do ładnego formatowania
                 st.markdown(f"### :{color}[{item['Akcja']}] {item['Przedmiot']}")
                 st.caption(f"Typ: {item['Typ']}")
                 st.info(item['Rada'])
                 st.divider()
     else:
-        st.warning("Nie udało się rozpoznać znanych przedmiotów. Spróbuj wyraźniejsze zdjęcie lub zaktualizuj bazę danych.")
+        st.warning("Nie udało się rozpoznać znanych przedmiotów.")
+        st.info("Wskazówka: Upewnij się, że zdjęcie jest wyraźne, a nazwy przedmiotów są w naszej bazie JSON.")
 
-    # Debug (opcjonalnie - żeby widzieć co OCR przeczytał surowo)
+    # Debug (opcjonalnie)
     with st.expander("Pokaż surowy tekst z OCR (dla debugowania)"):
         st.text(raw_text)

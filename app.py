@@ -5,21 +5,24 @@ import pytesseract
 import json
 from PIL import Image
 
-# --- STAŁE KONFIGURACYJNE (USTALONE Z TWOJEGO SCREENA) ---
+# --- STAŁE KONFIGURACYJNE (USTALONE Z TWOJEGO SCREENA 1080p) ---
+
+# Wymiary slotów i siatki
 SLOT_WIDTH = 75
 SLOT_HEIGHT = 75
 SPACING = 13
 GRID_COLS = 8
 GRID_ROWS = 6
 
-# Wracamy do stabilnego punktu startowego siatki Cargo (pod nagłówkiem)
+# Współrzędne startowe siatki Cargo (ustabilizowane po wielu testach)
 START_X = 50 
 START_Y = 265 
 
-# Zwiększamy offset, aby wycelować w środek symbolu
-SYMBOL_ROI_OFFSET_X = 15 # Było 10 - Celujemy w prawo
-SYMBOL_ROI_OFFSET_Y = 15 # Było 10 - Celujemy w dół
-SYMBOL_ROI_SIZE = 25
+# ROI (Region of Interest) dla symbolu pierwiastka (wewnątrz slotu 75x75)
+# Zwiększono rozmiar na 35x35 dla lepszego działania OCR
+SYMBOL_ROI_OFFSET_X = 15 
+SYMBOL_ROI_OFFSET_Y = 15 
+SYMBOL_ROI_SIZE = 35 # Zwiększone z 25 na 35
 
 # Baza symboli do konwersji (Musi pasować do kluczy z nms_items.json)
 SYMBOL_TO_ITEM = {
@@ -28,7 +31,8 @@ SYMBOL_TO_ITEM = {
     "H": "HYDROGEN", "CL": "CHLORINE", "CO": "COBALT",
     "FE+": "PURE FERRITE",      # Wersja z plusem
     "O+": "CONDENSED OXYGEN",    # Wersja z plusem
-    "NA+": "DI-SODIUM"           # Wersja z plusem
+    "NA+": "DI-SODIUM",          # Wersja z plusem
+    # Dodaj tutaj więcej symboli i ich ulepszonych wersji!
 }
 # --- KONIEC STAŁYCH ---
 
@@ -50,7 +54,7 @@ def load_db():
 def find_symbol_slots(img_cv):
     """
     Krok 1: Wycina i wstępnie przetwarza maleńkie obszary symboli.
-    Dodano weryfikację wizualną ROI.
+    Dodano znaczniki wizualne w debugu (krzyżyki).
     """
     symbol_images = []
     
@@ -73,13 +77,12 @@ def find_symbol_slots(img_cv):
             # Weryfikacja: upewniamy się, że slot został poprawnie wycięty
             if symbol_img.shape[0] == SYMBOL_ROI_SIZE and symbol_img.shape[1] == SYMBOL_ROI_SIZE:
                 
-                # ------ KRYTYCZNY DEBUG WIZUALNY ------
-                # Rysujemy biały krzyżyk na środku wycinanego symbolu, 
-                # aby upewnić się, że w ogóle coś widać w sekcji debugowania.
+                # --- WIZUALNY ZNACZNIK DEBUGOWANIA (BIAŁY KRZYŻYK) ---
+                # Rysujemy biały krzyżyk, aby potwierdzić, że obszar jest wycinany.
                 center = SYMBOL_ROI_SIZE // 2
                 cv2.line(symbol_img, (center-5, center), (center+5, center), 255, 1) # Linia pozioma
                 cv2.line(symbol_img, (center, center-5), (center, center+5), 255, 1) # Linia pionowa
-                # --------------------------------------
+                # ----------------------------------------------------
 
                 symbol_images.append(symbol_img)
             else:
@@ -93,8 +96,9 @@ def analyze_symbols(symbol_images, db):
     """
     results = []
     
-    # Konfiguracja OCR: pozwala na litery, cyfry i znak plus (+)
-    custom_config = r'--psm 10 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+' 
+    # Konfiguracja OCR: usunięto PSM 10, aby poprawić rozpoznawanie liter.
+    # Lista dozwolonych znaków to litery, cyfry i znak plus (+)
+    custom_config = r'-c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+' 
 
     for i, symbol_img in enumerate(symbol_images):
         if symbol_img is None: continue
@@ -158,14 +162,15 @@ if uploaded_file is not None:
                 st.info(item['Rada'])
                 st.divider()
     else:
-        st.error("Nie znaleziono znanych zasobów (brak symboli lub błędny odczyt).")
+        st.error("Nie znaleziono znanych zasobów. Jeśli widzisz symbole w diagnostyce, zaktualizuj SYMBOL_TO_ITEM.")
 
     # --- DEBUG VIEW ---
-    with st.expander("👁️ Zobacz diagnostykę cięcia symboli", expanded=False):
-        st.write("Pierwsze 8 slotów po obróbce (widoczne tylko małe symbole):")
+    with st.expander("👁️ Zobacz diagnostykę cięcia symboli", expanded=True):
+        st.write("Wycinek symboli z pierwszych 8 slotów:")
         if symbol_slots and all(s is not None for s in symbol_slots[:8]):
-            # Aby wyświetlić symbole, łączymy je horyzontalnie
+            # Łączymy pierwsze 8 symboli
             combined_symbols = np.hstack(symbol_slots[:8])
-            st.image(combined_symbols, caption="Wycinek symboli z pierwszych 8 slotów (Powinny być wyraźne, białe symbole)", clamp=True)
+            # Zmieniamy kolor z powrotem na RGB, by streamlit mógł to wyświetlić (mimo że jest czarno-białe)
+            st.image(combined_symbols, caption="Wycinek symboli (powinny być widoczne symbole i białe krzyżyki)", clamp=True)
         
         st.write(f"Zarejestrowane symbole (w bazie): {list(SYMBOL_TO_ITEM.keys())}")

@@ -6,18 +6,20 @@ import json
 from PIL import Image
 
 # --- STAŁE KONFIGURACYJNE (USTALONE Z TWOJEGO SCREENA) ---
-# Współrzędne dla Cargo/General Inventory (8x6) na screenie 1080p
 SLOT_WIDTH = 75
 SLOT_HEIGHT = 75
 SPACING = 13
 GRID_COLS = 8
 GRID_ROWS = 6
+
+# Zmieniamy, aby zaczynać bliżej oryginalnego, stabilnego punktu (pod CARGO)
 START_X = 50 
-START_Y = 265 
+START_Y = 265 # Resetujemy do pierwotnej wartości (zaraz pod "CARGO")
 
 # ROI (Region of Interest) dla symbolu pierwiastka (wewnątrz slotu 75x75)
-SYMBOL_ROI_OFFSET_X = 5
-SYMBOL_ROI_OFFSET_Y = 5
+# PRZESUWAMY OKNO CIĘCIA DALEJ OD ABSOLUTNEGO NAROŻNIKA, CELUJĄC W ŚRODEK SYMBOLU
+SYMBOL_ROI_OFFSET_X = 10 # Było 2
+SYMBOL_ROI_OFFSET_Y = 10 # Było 2
 SYMBOL_ROI_SIZE = 25
 
 # Baza symboli do konwersji (Musi pasować do kluczy z nms_items.json)

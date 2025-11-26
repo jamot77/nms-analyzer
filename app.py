@@ -16,15 +16,15 @@ from PIL import Image
 # --- KONIEC WYJAŚNIEŃ ---
 
 # Wymiary slotów i siatki
-SLOT_WIDTH = 75
-SLOT_HEIGHT = 75
-SPACING = 13
+SLOT_WIDTH = 165
+SLOT_HEIGHT = 165
+SPACING = 20
 GRID_COLS = 8
 GRID_ROWS = 6
 
 # Wracamy do PUNKTU STARTOWEGO, który był POD SŁOWEM "CARGO"
-START_X = 50 
-START_Y = 285 # Było 265. Przesuwamy o 20 pikseli W DÓŁ.
+START_X = 350
+START_Y = 800 # Było 265. Przesuwamy o 20 pikseli W DÓŁ.
 
 # ROI (Region of Interest) dla symbolu pierwiastka
 # Lekko zwiększamy offset Y, aby lepiej wycelować w symbol wewnątrz kwadratu

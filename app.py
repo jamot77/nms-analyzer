@@ -12,14 +12,13 @@ SPACING = 13
 GRID_COLS = 8
 GRID_ROWS = 6
 
-# Zmieniamy, aby zaczynać bliżej oryginalnego, stabilnego punktu (pod CARGO)
-START_X = 50 
-START_Y = 265 # Resetujemy do pierwotnej wartości (zaraz pod "CARGO")
+# RADYKALNE PRZESUNIĘCIE W GÓRĘ I W LEWO:
+START_X = 20  # Było 50 - Przesuwamy o 30 pikseli w lewo!
+START_Y = 220 # Było 265 - Przesuwamy o 45 pikseli w górę!
 
-# ROI (Region of Interest) dla symbolu pierwiastka (wewnątrz slotu 75x75)
-# PRZESUWAMY OKNO CIĘCIA DALEJ OD ABSOLUTNEGO NAROŻNIKA, CELUJĄC W ŚRODEK SYMBOLU
-SYMBOL_ROI_OFFSET_X = 10 # Było 2
-SYMBOL_ROI_OFFSET_Y = 10 # Było 2
+# ROI (Region of Interest) dla symbolu
+SYMBOL_ROI_OFFSET_X = 10 
+SYMBOL_ROI_OFFSET_Y = 10 
 SYMBOL_ROI_SIZE = 25
 
 # Baza symboli do konwersji (Musi pasować do kluczy z nms_items.json)

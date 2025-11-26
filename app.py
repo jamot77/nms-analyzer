@@ -22,14 +22,15 @@ SPACING = 13
 GRID_COLS = 8
 GRID_ROWS = 6
 
-# Współrzędne startowe siatki Cargo (ustabilizowane)
+# Wracamy do PUNKTU STARTOWEGO, który był POD SŁOWEM "CARGO"
 START_X = 50 
-START_Y = 265 
+START_Y = 285 # Było 265. Przesuwamy o 20 pikseli W DÓŁ.
 
 # ROI (Region of Interest) dla symbolu pierwiastka
+# Lekko zwiększamy offset Y, aby lepiej wycelować w symbol wewnątrz kwadratu
 SYMBOL_ROI_OFFSET_X = 15 
-SYMBOL_ROI_OFFSET_Y = 15 
-SYMBOL_ROI_SIZE = 35 # Zwiększone z 25 na 35
+SYMBOL_ROI_OFFSET_Y = 18 # Było 15. Przesuwamy o 3 piksele W DÓŁ.
+SYMBOL_ROI_SIZE = 35
 
 # Baza symboli do konwersji (Musi pasować do kluczy z nms_items.json)
 SYMBOL_TO_ITEM = {

@@ -15,22 +15,23 @@ from PIL import Image
 # SYMBOL_ROI_...: Współrzędne i rozmiar małego obszaru, z którego wycinamy symbol pierwiastka (np. 'Fe').
 # --- KONIEC WYJAŚNIEŃ ---
 
-# Wymiary slotów i siatki
+# --- STAŁE KONFIGURACYJNE (FINALNA KALIBRACJA 4K / 3840x2160) ---
+
+# Wymiary slotów i siatki (dane z Twojego 4K)
 SLOT_WIDTH = 165
 SLOT_HEIGHT = 165
-SPACING = 20
-GRID_COLS = 10
-GRID_ROWS = 2
+SPACING = 20 # Odstęp między slotami
+GRID_COLS = 10 # PRAWIDŁOWA LICZBA KOLUMN DLA TWOJEJ KONFIGURACJI
+GRID_ROWS = 4  # PRAWIDŁOWA LICZBA RZĘDÓW DLA TWOJEJ KONFIGURACJI
 
-# Wracamy do PUNKTU STARTOWEGO, który był POD SŁOWEM "CARGO"
-START_X = 350
-START_Y = 800 # Było 265. Przesuwamy o 20 pikseli W DÓŁ.
+# Współrzędne startowe siatki (dostosowane do 4K i celowania w symbol)
+START_X = 350 # Na podstawie Twojego udanego testu z tą wartością
+START_Y = 800 # Na podstawie Twojego udanego testu z tą wartością
 
-# ROI (Region of Interest) dla symbolu pierwiastka
-# Lekko zwiększamy offset Y, aby lepiej wycelować w symbol wewnątrz kwadratu
-SYMBOL_ROI_OFFSET_X = 15 
-SYMBOL_ROI_OFFSET_Y = 18 # Było 15. Przesuwamy o 3 piksele W DÓŁ.
-SYMBOL_ROI_SIZE = 35
+# ROI (Region of Interest) dla symbolu pierwiastka (proporcjonalnie większe)
+SYMBOL_ROI_OFFSET_X = 30 # Lekko zmniejszone, by uniknąć zaszumionych krawędzi
+SYMBOL_ROI_OFFSET_Y = 30 # Lekko zmniejszone, by uniknąć zaszumionych krawędzi
+SYMBOL_ROI_SIZE = 70 
 
 # Baza symboli do konwersji (Musi pasować do kluczy z nms_items.json)
 SYMBOL_TO_ITEM = {

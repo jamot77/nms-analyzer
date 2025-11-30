@@ -22,16 +22,16 @@ SLOT_WIDTH = 165
 SLOT_HEIGHT = 165
 SPACING = 20 # Odstęp między slotami
 GRID_COLS = 10 # PRAWIDŁOWA LICZBA KOLUMN DLA TWOJEJ KONFIGURACJI
-GRID_ROWS = 4  # PRAWIDŁOWA LICZBA RZĘDÓW DLA TWOJEJ KONFIGURACJI
+GRID_ROWS = 10  # PRAWIDŁOWA LICZBA RZĘDÓW DLA TWOJEJ KONFIGURACJI
 
 # Współrzędne startowe siatki (dostosowane do 4K i celowania w symbol)
 START_X = 350 # Na podstawie Twojego udanego testu z tą wartością
 START_Y = 950 # Na podstawie Twojego udanego testu z tą wartością
 
 # ROI (Region of Interest) dla symbolu pierwiastka (proporcjonalnie większe)
-SYMBOL_ROI_OFFSET_X = 30 # Lekko zmniejszone, by uniknąć zaszumionych krawędzi
-SYMBOL_ROI_OFFSET_Y = 30 # Lekko zmniejszone, by uniknąć zaszumionych krawędzi
-SYMBOL_ROI_SIZE = 70 
+SYMBOL_ROI_OFFSET_X = 0 # Lekko zmniejszone, by uniknąć zaszumionych krawędzi
+SYMBOL_ROI_OFFSET_Y = 0 # Lekko zmniejszone, by uniknąć zaszumionych krawędzi
+SYMBOL_ROI_SIZE = 40 
 
 # Baza symboli do konwersji (Musi pasować do kluczy z nms_items.json)
 SYMBOL_TO_ITEM = {

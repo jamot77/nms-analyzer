@@ -5,35 +5,22 @@ import pytesseract
 import json
 from PIL import Image
 
-# --- STAŁE KONFIGURACYJNE (USTALONE Z TWOJEGO SCREENA 1080p) ---
-
-# --- WYJAŚNIENIE STAŁYCH (NOWY BLOK) ---
-# SLOT_WIDTH/HEIGHT: Rozmiar jednego slotu ekwipunku w pikselach (np. 75x75).
-# SPACING: Odległość między slotami w pikselach (np. 13px).
-# GRID_COLS/ROWS: Wymiary siatki głównej (np. 8x6 dla Cargo).
-# START_X/Y: Współrzędne (piksel) górnego lewego rogu PIERWSZEGO slotu siatki Cargo.
-# SYMBOL_ROI_...: Współrzędne i rozmiar małego obszaru, z którego wycinamy symbol pierwiastka (np. 'Fe').
-# --- KONIEC WYJAŚNIEŃ ---
-
-# --- STAŁE KONFIGURACYJNE (FINALNA KALIBRACJA 4K / 3840x2160) ---
-
-# Wymiary slotów i siatki (dane z Twojego 4K)
+# --- STAŁE KONFIGURACYJNE ---
+# Stałe związane z WYMIARAMI slotów (muszą być poprawne dla Twojej rozdzielczości 4K)
 SLOT_WIDTH = 165
 SLOT_HEIGHT = 165
-SPACING = 20 # Odstęp między slotami
-GRID_COLS = 10 # PRAWIDŁOWA LICZBA KOLUMN DLA TWOJEJ KONFIGURACJI
-GRID_ROWS = 10  # PRAWIDŁOWA LICZBA RZĘDÓW DLA TWOJEJ KONFIGURACJI
+SPACING = 20 
 
-# Współrzędne startowe siatki (dostosowane do 4K i celowania w symbol)
-START_X = 350 # Na podstawie Twojego udanego testu z tą wartością
-START_Y = 1000 # Na podstawie Twojego udanego testu z tą wartością
+# PRAWIDŁOWY ROZMIAR SIATKI CARGO
+GRID_COLS = 8 
+GRID_ROWS = 6 
 
 # ROI (Region of Interest) dla symbolu pierwiastka (proporcjonalnie większe)
-SYMBOL_ROI_OFFSET_X = 10 # Lekko zmniejszone, by uniknąć zaszumionych krawędzi
-SYMBOL_ROI_OFFSET_Y = 10 # Lekko zmniejszone, by uniknąć zaszumionych krawędzi
+SYMBOL_ROI_OFFSET_X = 30 
+SYMBOL_ROI_OFFSET_Y = 30 
 SYMBOL_ROI_SIZE = 70 
 
-# Baza symboli do konwersji (Musi pasować do kluczy z nms_items.json)
+# Baza symboli (pozostała bez zmian)
 SYMBOL_TO_ITEM = {
     "C": "CARBON", "NA": "SODIUM", "FE": "FERRITE DUST",
     "O": "OXYGEN", "ZN": "ZINC", "CU": "COPPER",
@@ -41,7 +28,7 @@ SYMBOL_TO_ITEM = {
     "FE+": "PURE FERRITE",      
     "O+": "CONDENSED OXYGEN",    
     "NA+": "DI-SODIUM",          
-    "+": "PURE FERRITE" # Domyślne mapowanie dla symbolu plus, gdy litera jest ignorowana
+    "+": "PURE FERRITE" 
 }
 # --- KONIEC STAŁYCH ---
 
@@ -60,25 +47,59 @@ def load_db():
         return {}
 
 def preprocess_image(img_cv):
-    """
-    Krok 0: Wstępne przetwarzanie obrazu (Adaptive Thresholding).
-    Zwraca przetworzony obraz, który może być użyty do pełnego OCR.
-    """
+    """Wstępne przetwarzanie obrazu (Adaptive Thresholding)."""
     img_gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
     blur = cv2.GaussianBlur(img_gray, (3, 3), 0)
-    
-    # Adaptive Thresholding lepiej radzi sobie ze zmiennym oświetleniem/kontrastem
     thresh = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
                                    cv2.THRESH_BINARY, 11, 2)
     return thresh
 
-def find_symbol_slots(img_cv):
+def find_cargo_anchor(img_cv):
     """
-    Krok 1: Wycina i wstępnie przetwarza maleńkie obszary symboli.
+    DYNAMICZNIE WYSZUKUJE NAPIS 'CARGO' NA CAŁYM EKRANIE i określa punkt startowy.
+    """
+    # Używamy konwersji do PIL dla pełnego OCR
+    image_pil = Image.fromarray(cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB))
+    
+    # Konfiguracja OCR do szukania tekstu (tryb PSM 3 jest dobry dla całej strony)
+    full_config = r'--psm 3' 
+    
+    # Wykonujemy OCR i parsujemy dane
+    data = pytesseract.image_to_data(image_pil, config=full_config, output_type=pytesseract.Output.DICT)
+    
+    # Szukamy słowa 'CARGO'
+    for i, text in enumerate(data['text']):
+        if text.upper().strip() == 'CARGO':
+            # Znaleziono! Używamy współrzędnych tekstu
+            x = data['left'][i]
+            y = data['top'][i]
+            w = data['width'][i]
+            h = data['height'][i]
+            
+            # Punkt startowy dla cięcia siatki CARGO:
+            # START_X: X napisu CARGO (lub jego lewa krawędź)
+            # START_Y: Dolna krawędź napisu + stały margines (sloty zaczynają się tuż poniżej)
+            
+            # Zakładamy, że siatka Cargo zaczyna się na tej samej wysokości X
+            start_x = x 
+            
+            # START_Y to dolna krawędź tekstu (y + h) + mały margines (np. 15 pikseli w 4K)
+            start_y = y + h + 15
+            
+            # Zwracamy lewą krawędź i dół napisu jako początek siatki
+            return start_x, start_y
+            
+    # Jeśli nie znaleziono, zwracamy stałe, które ustabilizowaliśmy
+    return 350, 1050 
+
+def find_symbol_slots(img_cv, START_X, START_Y):
+    """
+    Krok 1: Wycina i wstępnie przetwarza maleńkie obszary symboli, 
+    używając dynamicznych współrzędnych.
     """
     symbol_images = []
     
-    # Przetwarzanie całego obrazu (Adaptive Thresholding)
+    # Przetwarzanie całego obrazu
     thresh = preprocess_image(img_cv)
     
     for row in range(GRID_ROWS):
@@ -95,18 +116,17 @@ def find_symbol_slots(img_cv):
             # Weryfikacja: upewniamy się, że slot został poprawnie wycięty
             if symbol_img.shape[0] == SYMBOL_ROI_SIZE and symbol_img.shape[1] == SYMBOL_ROI_SIZE:
                 
-                # --- WIZUALNY ZNACZNIK DEBUGOWANIA (BIAŁY KRZYŻYK) ---
-                # Rysujemy biały krzyżyk na wycinanym obszarze.
+                # --- WIZUALNY ZNACZNIK DEBUGOWANIA ---
                 center = SYMBOL_ROI_SIZE // 2
                 cv2.line(symbol_img, (center-5, center), (center+5, center), 255, 1)
                 cv2.line(symbol_img, (center, center-5), (center, center+5), 255, 1)
-                # ----------------------------------------------------
+                # ------------------------------------
 
                 symbol_images.append(symbol_img)
             else:
                 symbol_images.append(None) 
 
-    return symbol_images, thresh # Zwracamy również przetworzony obraz
+    return symbol_images, thresh 
 
 def analyze_symbols(symbol_images, db):
     """
@@ -114,7 +134,7 @@ def analyze_symbols(symbol_images, db):
     """
     results = []
     
-    # Konfiguracja OCR: brak PSM, lista dozwolonych znaków to litery, cyfry i znak plus (+)
+    # Konfiguracja OCR
     custom_config = r'-c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+' 
 
     for i, symbol_img in enumerate(symbol_images):
@@ -144,8 +164,8 @@ def analyze_symbols(symbol_images, db):
 
 # --- INTERFEJS UŻYTKOWNIKA (FRONTEND) ---
 
-st.title("🧪 NMS Resource Analyzer (Symbol OCR)")
-st.write("Wykrywanie zasobów na podstawie symboli z Tablicy Mendelejewa.")
+st.title("🧪 NMS Resource Analyzer (Dynamic OCR)")
+st.write("Dynamiczne wykrywanie zasobów, start cięcia kotwiczony na nagłówku 'CARGO'.")
 
 uploaded_file = st.file_uploader("Wybierz zdjęcie...", type=["jpg", "png", "jpeg"])
 
@@ -154,12 +174,19 @@ if uploaded_file is not None:
     image_pil = Image.open(uploaded_file)
     image_cv = cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
 
-    st.write("⚙️ Wykrywam symbole z 48 slotów...")
+    st.write("⚙️ Wyszukuję punkt kotwiczenia 'CARGO'...")
+    
+    # ** DYNAMICZNE WYSZUKIWANIE WSPÓŁRZĘDNYCH **
+    dynamic_start_x, dynamic_start_y = find_cargo_anchor(image_cv)
+    
+    st.write(f"✅ Znaleziono punkt startowy (Anchor): X={dynamic_start_x}, Y={dynamic_start_y}")
     
     database = load_db()
     
-    # 2. Cięcie i przetwarzanie
-    symbol_slots, full_thresholded_image = find_symbol_slots(image_cv)
+    st.write("⚙️ Wycinam sloty na podstawie kotwicy...")
+
+    # 2. Cięcie i przetwarzanie (używamy dynamicznych współrzędnych)
+    symbol_slots, full_thresholded_image = find_symbol_slots(image_cv, dynamic_start_x, dynamic_start_y)
     
     # 3. Analiza
     found_resources = analyze_symbols(symbol_slots, database)
@@ -177,25 +204,24 @@ if uploaded_file is not None:
                 st.info(item['Rada'])
                 st.divider()
     else:
-        st.error("Nie znaleziono znanych zasobów. Jeśli widzisz symbole w diagnostyce, zaktualizuj SYMBOL_TO_ITEM.")
+        st.error("Nie znaleziono znanych zasobów. Sprawdź diagnostykę poniżej.")
 
     # --- DEBUG VIEW ---
     with st.expander("👁️ DIAGNOSTYKA I WERYFIKACJA (Symbol OCR)", expanded=True):
         
-        # 1. PEŁNY PRZETWORZONY OBRAZ (NOWY WYMAGANY BLOK)
+        # 1. PEŁNY PRZETWORZONY OBRAZ
         st.subheader("1. Pełny Przetworzony Obraz (Adaptive Threshold)")
-        st.image(full_thresholded_image, caption="Cały obraz po filtrowaniu (tu symbole są bardzo wyraźne)", clamp=True)
+        st.image(full_thresholded_image, caption="Cały obraz po filtrowaniu", clamp=True)
         
-        # 2. WYCINANE SLOTY (WIĘCEJ SLOTÓW)
+        # 2. WYCINANE SLOTY
         st.subheader("2. Wycinki Symboli (2 rzędy - 16 slotów)")
-        # Wyświetlamy 16 slotów (2 pełne rzędy)
         if symbol_slots and all(s is not None for s in symbol_slots[:16]):
             row1 = np.hstack(symbol_slots[:8])
             row2 = np.hstack(symbol_slots[8:16])
             combined_symbols = np.vstack([row1, row2])
-            st.image(combined_symbols, caption="Wycinki symboli z białymi krzyżykami (Sprawdź, czy celują w symbol)", clamp=True)
+            st.image(combined_symbols, caption="Wycinki symboli z białymi krzyżykami (muszą celować w symbol!)", clamp=True)
         
-        # 3. ZAREJESTROWANE SYMBOLE
+        # 3. KONFIGURACJA
         st.subheader("3. Konfiguracja")
         st.write(f"Zarejestrowane symbole (w bazie): {list(SYMBOL_TO_ITEM.keys())}")
-        st.caption("Jeśli OCR odczytuje '+' zamiast 'FE+', musimy dodać do bazy więcej symboli 'FE', 'NA' itp.")
+        st.write(f"Wymiary Siatki (oczekiwane): {GRID_COLS}x{GRID_ROWS}")

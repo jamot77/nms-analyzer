@@ -26,7 +26,7 @@ GRID_ROWS = 4  # PRAWIDŁOWA LICZBA RZĘDÓW DLA TWOJEJ KONFIGURACJI
 
 # Współrzędne startowe siatki (dostosowane do 4K i celowania w symbol)
 START_X = 350 # Na podstawie Twojego udanego testu z tą wartością
-START_Y = 800 # Na podstawie Twojego udanego testu z tą wartością
+START_Y = 950 # Na podstawie Twojego udanego testu z tą wartością
 
 # ROI (Region of Interest) dla symbolu pierwiastka (proporcjonalnie większe)
 SYMBOL_ROI_OFFSET_X = 30 # Lekko zmniejszone, by uniknąć zaszumionych krawędzi

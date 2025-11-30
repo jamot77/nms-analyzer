@@ -29,9 +29,9 @@ START_X = 350 # Na podstawie Twojego udanego testu z tą wartością
 START_Y = 950 # Na podstawie Twojego udanego testu z tą wartością
 
 # ROI (Region of Interest) dla symbolu pierwiastka (proporcjonalnie większe)
-SYMBOL_ROI_OFFSET_X = 0 # Lekko zmniejszone, by uniknąć zaszumionych krawędzi
-SYMBOL_ROI_OFFSET_Y = 0 # Lekko zmniejszone, by uniknąć zaszumionych krawędzi
-SYMBOL_ROI_SIZE = 40 
+SYMBOL_ROI_OFFSET_X = 5 # Lekko zmniejszone, by uniknąć zaszumionych krawędzi
+SYMBOL_ROI_OFFSET_Y = 5 # Lekko zmniejszone, by uniknąć zaszumionych krawędzi
+SYMBOL_ROI_SIZE = 70 
 
 # Baza symboli do konwersji (Musi pasować do kluczy z nms_items.json)
 SYMBOL_TO_ITEM = {

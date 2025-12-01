@@ -11,14 +11,14 @@ from PIL import Image
 # Te stałe odnoszą się do WYMIARÓW slotów, a nie ich pozycji.
 SLOT_WIDTH = 165
 SLOT_HEIGHT = 165
-SPACING = 20
+SPACING = 5
 CONFIDENCE_THRESHOLD = 0.85 # Próg dopasowania szablonu (85%)
 
 # Konfiguracja siatek (na podstawie Twojego screena 4K)
 GRID_CONFIGS = {
     # Założenia: Siatka zaczyna się 10px pod napisem nagłówka.
-    "TECHNOLOGY": {"COLS": 8, "ROWS": 2, "X_OFFSET": -85, "Y_OFFSET": 10}, 
-    "CARGO": {"COLS": 8, "ROWS": 6, "X_OFFSET": -85, "Y_OFFSET": 10} 
+    "TECHNOLOGY": {"COLS": 8, "ROWS": 2, "X_OFFSET": -90, "Y_OFFSET": 10}, 
+    "CARGO": {"COLS": 8, "ROWS": 6, "X_OFFSET": -90, "Y_OFFSET": 10} 
 }
 
 # --- FOLDERY BAZY SZABLONÓW ---

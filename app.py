@@ -17,8 +17,8 @@ CONFIDENCE_THRESHOLD = 0.85 # Próg dopasowania szablonu (85%)
 # Konfiguracja siatek (na podstawie Twojego screena 4K)
 GRID_CONFIGS = {
     # Ujemny X_OFFSET (-10) jest dodany, aby cięcie zaczęło się wystarczająco wcześnie
-    "TECHNOLOGY": {"COLS": 8, "ROWS": 2, "X_OFFSET": -10, "Y_OFFSET": 10}, 
-    "CARGO": {"COLS": 8, "ROWS": 6, "X_OFFSET": -10, "Y_OFFSET": 10} 
+    "TECHNOLOGY": {"COLS": 8, "ROWS": 2, "X_OFFSET": -90, "Y_OFFSET": 10}, 
+    "CARGO": {"COLS": 8, "ROWS": 6, "X_OFFSET": -90, "Y_OFFSET": 10} 
 }
 
 # --- FOLDERY BAZY SZABLONÓW ---

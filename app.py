@@ -16,7 +16,8 @@ CONFIDENCE_THRESHOLD = 0.85 # Próg dopasowania szablonu (85%)
 
 # Konfiguracja siatek (na podstawie Twojego screena 4K)
 GRID_CONFIGS = {
-    "TECHNOLOGY": {"COLS": 8, "ROWS": 2, "X_OFFSET": 0, "Y_OFFSET": 10}, # Lekki margines 10px pod napisem
+    # Założenia: Siatka zaczyna się 10px pod napisem nagłówka.
+    "TECHNOLOGY": {"COLS": 8, "ROWS": 2, "X_OFFSET": 0, "Y_OFFSET": 10}, 
     "CARGO": {"COLS": 8, "ROWS": 6, "X_OFFSET": 0, "Y_OFFSET": 10} 
 }
 
@@ -50,23 +51,28 @@ def load_templates():
     templates = {}
     for filepath in glob.glob(os.path.join(TEMPLATE_DIR, "*.png")):
         filename = os.path.basename(filepath)
-        # Kluczem jest nazwa pliku bez rozszerzenia (np. "CARBON")
         item_name = os.path.splitext(filename)[0].upper()
+        # Ważne: Wczytujemy szablony w skali szarości!
         templates[item_name] = cv2.imread(filepath, cv2.IMREAD_GRAYSCALE)
     return templates
 
 def preprocess_image(img_cv):
-    """Wstępne przetwarzanie obrazu (Adaptive Thresholding)."""
+    """
+    Wstępne przetwarzanie obrazu (tylko skala szarości).
+    UWAGA: W Template Matching często lepiej jest używać samego obrazu w skali szarości, 
+    bez agresywnego Thresholdingu, aby zachować niuanse ikony.
+    """
     img_gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
-    blur = cv2.GaussianBlur(img_gray, (3, 3), 0)
-    # W Template Matching często lepiej jest użyć czystej szarości, ale spróbujmy Adaptive Thresh dla lepszego kontrastu
-    thresh = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-                                   cv2.THRESH_BINARY, 11, 2)
-    return cv2.cvtColor(thresh, cv2.COLOR_GRAY2BGR) # Konwersja z powrotem na BGR, by pasowało do logiki dalszej
+    
+    # Zwracamy szary obraz, ale konwertujemy go z powrotem na 3 kanały BGR (cv2.cvtColor(img_gray, cv2.COLOR_GRAY2BGR))
+    # jest to wymagane, aby Streamlit i dalsza logika cięcia (img_cv) działały bez problemów z wymiarami
+    return cv2.cvtColor(img_gray, cv2.COLOR_GRAY2BGR) 
+
 
 def find_anchors(img_cv):
     """DYNAMICZNIE WYSZUKUJE NAPISY 'TECHNOLOGY' i 'CARGO' i określa punkty startowe."""
     image_pil = Image.fromarray(cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB))
+    # Używamy PSM 3 (domyślny dla pełnej strony)
     data = pytesseract.image_to_data(image_pil, config=r'--psm 3', output_type=pytesseract.Output.DICT)
     anchors = {}
     
@@ -77,18 +83,26 @@ def find_anchors(img_cv):
             y = data['top'][i]
             h = data['height'][i]
             
-            # Punkt kotwiczenia: X lewej krawędzi tekstu, Y tuż pod tekstem
             anchor_x = x + GRID_CONFIGS[word]['X_OFFSET']
             anchor_y = y + h + GRID_CONFIGS[word]['Y_OFFSET']
             
-            # Zapisujemy tylko pierwsze wystąpienie (najbardziej wiarygodne)
             if word not in anchors:
                 anchors[word] = {"x": anchor_x, "y": anchor_y}
                 
+    # Domyślne wartości dla 4K, jeśli OCR zawiedzie (na podstawie Twoich ostatnich testów)
+    if 'CARGO' not in anchors:
+        # Używamy ustalonych koordynatów, gdy dynamiczne wykrywanie zawiedzie
+        anchors['CARGO'] = {"x": 350, "y": 1050} 
+    
     return anchors
 
 def process_grid(img_cv, anchor_name, anchor_coords):
     """Tnie całą siatkę slotów na podstawie kotwicy."""
+    
+    # 1. PRZETWARZANIE WSTĘPNE JEDYNIE DO SZAROŚCI
+    # Używamy obrazu przetwarzanego wstępnie (szarość), aby z niego wycinać sloty
+    img_processed = preprocess_image(img_cv)
+    
     START_X = anchor_coords["x"]
     START_Y = anchor_coords["y"]
     config = GRID_CONFIGS[anchor_name]
@@ -103,25 +117,31 @@ def process_grid(img_cv, anchor_name, anchor_coords):
             x_end = x_start + SLOT_WIDTH
             y_end = y_start + SLOT_HEIGHT
             
-            # Wycina pełny slot
-            slot_img = img_cv[y_start:y_end, x_start:x_end]
+            # Wycina pełny slot z obrazu w skali szarości (BGR z trzema kanałami)
+            slot_img = img_processed[y_start:y_end, x_start:x_end]
             
             if slot_img.shape[0] == SLOT_HEIGHT and slot_img.shape[1] == SLOT_WIDTH:
-                 # Konwersja na szarość i zapisanie jako obiekt
-                slot_gray = cv2.cvtColor(slot_img, cv2.COLOR_BGR2GRAY)
+                # Konwersja na czystą szarość (1 kanał) do Template Matching
+                slot_gray = cv2.cvtColor(slot_img, cv2.COLOR_BGR2GRAY) 
                 slots.append({"grid": anchor_name, "img": slot_gray, "index": row * config["COLS"] + col})
             
     return slots
 
 def match_template(slot_img, templates):
     """Wykonuje Template Matching dla pojedynczego slotu."""
-    
     best_match_name = None
     max_corr = -1
     
     for item_name, template in templates.items():
-        # Używamy CCorrNormed, który jest odporny na jasność
-        result = cv2.matchTemplate(slot_img, template, cv2.TM_CCOEFF_NORMED)
+        # Upewnienie się, że szablon ma taki sam rozmiar jak slot (Template Matching wymaga tego)
+        if template.shape != slot_img.shape:
+            # Wymuszamy reskalowanie szablonu, chociaż idealnie powinny mieć ten sam rozmiar
+            template_resized = cv2.resize(template, (slot_img.shape[1], slot_img.shape[0]))
+        else:
+            template_resized = template
+
+        # Używamy CCorrNormed, który jest odporny na jasność i skalę
+        result = cv2.matchTemplate(slot_img, template_resized, cv2.TM_CCOEFF_NORMED)
         
         _, max_val, _, _ = cv2.minMaxLoc(result)
         
@@ -137,7 +157,7 @@ def match_template(slot_img, templates):
 # --- INTERFEJS UŻYTKOWNIKA (FRONTEND) ---
 
 st.title("🚀 NMS Inventory Scanner (Template Matching)")
-st.write("Wykrywanie przedmiotów na podstawie ikon w Twojej rozdzielczości 4K.")
+st.write("Wykrywanie przedmiotów na podstawie ikon, zakotwiczenie na 'CARGO' / 'TECHNOLOGY'.")
 
 uploaded_file = st.file_uploader("Wybierz zdjęcie...", type=["jpg", "png", "jpeg"])
 
@@ -161,14 +181,14 @@ if uploaded_file is not None:
         all_slots.extend(process_grid(image_cv, name, coords))
         
     if not all_slots:
-        st.error("Nie znaleziono siatek CARGO ani TECHNOLOGY. Sprawdź, czy napisy są widoczne.")
+        st.error("Nie znaleziono siatek. Sprawdź, czy napisy są widoczne.")
         st.stop()
         
     st.write(f"Wycięto łącznie **{len(all_slots)}** slotów do analizy.")
     
     # 3. Analiza (Template Matching)
     found_resources = []
-    unknown_count = 0
+    unknown_slots_to_save = []
     
     for slot in all_slots:
         item_name, confidence = match_template(slot["img"], templates)
@@ -176,6 +196,7 @@ if uploaded_file is not None:
         if item_name:
             # Znany przedmiot - dodajemy do wyników
             if item_name in database:
+                 # Zapisujemy tylko unikalne przedmioty do tabeli wyników
                  if not any(d['Przedmiot'] == item_name for d in found_resources):
                     found_resources.append({
                         "Przedmiot": item_name,
@@ -186,13 +207,27 @@ if uploaded_file is not None:
                         "Confidence": confidence
                     })
         else:
-            # Nieznany przedmiot - zapisujemy jako szablon do opisania
-            # Zapobiegamy wielokrotnemu zapisywaniu tego samego (jeśli slot jest pusty, zapiszemy go raz jako PUSTY)
-            if unknown_count < 10: # Ograniczamy zapis do 10 pierwszych nieznanych
-                filename = os.path.join(UNKNOWN_DIR, f"UNKNOWN_{slot['grid']}_{slot['index']}_{int(confidence*100)}.png")
+            # Nieznany przedmiot - dodajemy do listy do zapisania
+            unknown_slots_to_save.append(slot)
+            
+    # Zapisywanie nieznanych slotów (aby uniknąć zapisywania pustych)
+    unknown_count = 0
+    if unknown_slots_to_save:
+         # Używamy zbioru do przechowywania unikalnych histogramów, aby nie zapisywać duplikatów
+        saved_histograms = set()
+        
+        for slot in unknown_slots_to_save:
+            # Tworzymy histogram (unikalny odcisk palca) dla obrazu
+            hist = cv2.calcHist([slot["img"]], [0], None, [256], [0, 256])
+            hist_tuple = tuple(hist.flatten()) # Konwersja na hashable tuple
+            
+            if hist_tuple not in saved_histograms:
+                # Jeśli histogram jest nowy, zapisujemy plik i dodajemy odcisk do zbioru
+                filename = os.path.join(UNKNOWN_DIR, f"UNKNOWN_{slot['grid']}_{slot['index']}_{os.urandom(4).hex()}.png")
                 cv2.imwrite(filename, slot["img"])
+                saved_histograms.add(hist_tuple)
                 unknown_count += 1
-
+                
     # --- WYNIKI ---
     st.header("Wyniki Skanowania")
     if found_resources:
@@ -210,23 +245,22 @@ if uploaded_file is not None:
         st.warning("Nie znaleziono znanych zasobów w ekwipunku.")
     
     if unknown_count > 0:
-         st.error(f"Zapisano {unknown_count} nieznanych ikon do folderu `{UNKNOWN_DIR}/`! Opisz je i przenieś do `{TEMPLATE_DIR}/`.")
+         st.error(f"Zapisano {unknown_count} unikalnych, nieznanych ikon do folderu `{UNKNOWN_DIR}/`! Opisz je i przenieś do `{TEMPLATE_DIR}/`.")
 
 
     # --- DEBUG VIEW ---
     with st.expander("👁️ DIAGNOSTYKA I GENEROWANIE SZABLONÓW", expanded=True):
         st.header("Instrukcja Generowania Bazy Ikon")
         st.markdown(f"""
-        1.  **Zobacz folder `{UNKNOWN_DIR}/`:** Znajdziesz tam pliki typu `UNKNOWN_CARGO_5_80.png`.
-        2.  **Opisz ikonę:** Jeśli ikona to **Chromatic Metal**, zmień nazwę pliku na **`CHROMATIC_METAL.png`**.
+        1.  **Zobacz folder `{UNKNOWN_DIR}/`:** Znajdziesz tam nowe pliki PNG.
+        2.  **Opisz ikonę:** Jeśli ikona to np. **Chromatic Metal**, zmień nazwę pliku na **`CHROMATIC_METAL.png`**.
         3.  **Przenieś plik:** Przenieś plik do folderu **`{TEMPLATE_DIR}/`**.
-        4.  **Odśwież aplikację:** Aplikacja automatycznie załaduje nowy szablon i zacznie rozpoznawać ten przedmiot!
+        4.  **Odśwież aplikację:** Aplikacja załaduje nowy szablon i zacznie rozpoznawać ten przedmiot.
         """)
         
         if all_slots:
-            st.subheader("Wycinki pierwszych 16 slotów (pełne ikony)")
+            st.subheader("Wycinki pierwszych 16 slotów (pełne ikony w skali szarości)")
             
-            # Wyświetlamy pierwsze 16 slotów
             slots_to_display = [cv2.cvtColor(slot['img'], cv2.COLOR_GRAY2BGR) for slot in all_slots[:16]]
             
             if len(slots_to_display) >= 8:

@@ -1,41 +1,50 @@
 import streamlit as st
 import cv2
 import numpy as np
-import pytesseract
 import json
-import os
-import glob
+import base64
 from PIL import Image
+import io
+import pytesseract
 
 # --- STAŁE KONFIGURACYJNE (Dostosowane do 4K) ---
-# Te stałe odnoszą się do WYMIARÓW slotów, a nie ich pozycji.
 SLOT_WIDTH = 165
 SLOT_HEIGHT = 165
 SPACING = 20
-CONFIDENCE_THRESHOLD = 0.85 # Próg dopasowania szablonu (85%)
+CONFIDENCE_THRESHOLD = 0.85 
 
-# Konfiguracja siatek (na podstawie Twojego screena 4K)
+# NOWA TRWAŁA BAZA DANYCH SZABLONÓW
+TEMPLATES_FILE = "templates.json"
+
+# Konfiguracja siatek (X_OFFSET = -90 na Twoje życzenie)
 GRID_CONFIGS = {
-    # Ujemny X_OFFSET (-10) jest dodany, aby cięcie zaczęło się wystarczająco wcześnie
     "TECHNOLOGY": {"COLS": 8, "ROWS": 2, "X_OFFSET": -90, "Y_OFFSET": 10}, 
     "CARGO": {"COLS": 8, "ROWS": 6, "X_OFFSET": -90, "Y_OFFSET": 10} 
 }
-
-# --- FOLDERY BAZY SZABLONÓW ---
-TEMPLATE_DIR = "templates"
-UNKNOWN_DIR = "unknown_templates"
-
-if not os.path.exists(TEMPLATE_DIR):
-    os.makedirs(TEMPLATE_DIR)
-if not os.path.exists(UNKNOWN_DIR):
-    os.makedirs(UNKNOWN_DIR)
 # --- KONIEC STAŁYCH ---
 
 st.set_page_config(page_title="🚀 NMS Scanner", page_icon="🧪")
 
+# --- FUNKCJE KODOWANIA/DEKODOWANIA (Base64) ---
+
+def encode_template(image_array):
+    """Koduje numpy array do Base64 String."""
+    # Tworzenie tymczasowego pliku PNG w pamięci
+    is_success, buffer = cv2.imencode(".png", image_array)
+    if is_success:
+        return base64.b64encode(buffer).decode('utf-8')
+    return None
+
+def decode_template(base64_string):
+    """Dekoduje Base64 String do numpy array (cv2 image)."""
+    img_bytes = base64.b64decode(base64_string)
+    nparr = np.frombuffer(img_bytes, np.uint8)
+    # Wczytujemy jako szary obraz (1 kanał)
+    return cv2.imdecode(nparr, cv2.IMREAD_GRAYSCALE)
+
 # --- FUNKCJE DANYCH I PRZETWARZANIA ---
 
-@st.cache_data
+@st.cache_data(show_spinner="Ładowanie bazy danych przedmiotów...")
 def load_db():
     try:
         with open('nms_items.json', 'r', encoding='utf-8') as f:
@@ -45,25 +54,20 @@ def load_db():
         st.error("Błąd: Nie znaleziono pliku nms_items.json!")
         return {}
 
-@st.cache_data
+@st.cache_data(show_spinner="Ładowanie bazy szablonów ikon...")
 def load_templates():
-    """Ładuje wszystkie szablony ikon z folderu templates/."""
+    """Ładuje szablony z pliku templates.json (Base64)."""
     templates = {}
-    for filepath in glob.glob(os.path.join(TEMPLATE_DIR, "*.png")):
-        filename = os.path.basename(filepath)
-        item_name = os.path.splitext(filename)[0].upper()
-        # Ważne: Wczytujemy szablony w skali szarości!
-        templates[item_name] = cv2.imread(filepath, cv2.IMREAD_GRAYSCALE)
+    try:
+        with open(TEMPLATES_FILE, 'r', encoding='utf-8') as f:
+            template_data = json.load(f)
+            for item_name, b64_string in template_data.items():
+                templates[item_name] = decode_template(b64_string)
+    except FileNotFoundError:
+        st.warning(f"Brak pliku {TEMPLATES_FILE}. Rozpocznij tworzenie bazy.")
+    except json.JSONDecodeError:
+        st.error(f"Błąd odczytu pliku {TEMPLATES_FILE}. Upewnij się, że jest to poprawny JSON.")
     return templates
-
-def preprocess_image(img_cv):
-    """
-    Wstępne przetwarzanie obrazu (tylko skala szarości).
-    Ta funkcja jest używana GŁÓWNIE przez dynamiczne szukanie kotwicy OCR.
-    """
-    img_gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
-    return cv2.cvtColor(img_gray, cv2.COLOR_GRAY2BGR) 
-
 
 def find_anchors(img_cv):
     """DYNAMICZNIE WYSZUKUJE NAPISY 'TECHNOLOGY' i 'CARGO' i określa punkty startowe."""
@@ -92,10 +96,8 @@ def find_anchors(img_cv):
 
 def process_grid(img_cv, anchor_name, anchor_coords):
     """
-    Tnie całą siatkę slotów na podstawie kotwicy.
-    Cięcie odbywa się z oryginalnego obrazu, a następnie kontrast jest wyrównywany.
+    Tnie całą siatkę slotów na podstawie kotwicy, konwertuje na szarość i wyrównuje kontrast.
     """
-    
     START_X = anchor_coords["x"]
     START_Y = anchor_coords["y"]
     config = GRID_CONFIGS[anchor_name]
@@ -130,15 +132,12 @@ def match_template(slot_img, templates):
     max_corr = -1
     
     for item_name, template in templates.items():
-        
-        # Template Matching wymaga, aby oba obrazy miały ten sam rozmiar.
         if template.shape != slot_img.shape:
             # Reskalowanie, jeśli rozmiary się nie zgadzają (awaryjnie)
             template_resized = cv2.resize(template, (slot_img.shape[1], slot_img.shape[0]))
         else:
             template_resized = template
 
-        # Używamy CCorrNormed, który jest odporny na jasność
         result = cv2.matchTemplate(slot_img, template_resized, cv2.TM_CCOEFF_NORMED)
         
         _, max_val, _, _ = cv2.minMaxLoc(result)
@@ -154,8 +153,8 @@ def match_template(slot_img, templates):
 
 # --- INTERFEJS UŻYTKOWNIKA (FRONTEND) ---
 
-st.title("🚀 NMS Inventory Scanner (Template Matching)")
-st.write("Wykrywanie przedmiotów na podstawie ikon, zakotwiczenie na 'CARGO' / 'TECHNOLOGY'.")
+st.title("🚀 NMS Inventory Scanner (Chmurowe zarządzanie bazą)")
+st.write("Wykrywanie przedmiotów na podstawie ikon. Zarządzaj szablonami bezpośrednio w tej aplikacji.")
 
 uploaded_file = st.file_uploader("Wybierz zdjęcie...", type=["jpg", "png", "jpeg"])
 
@@ -165,34 +164,31 @@ if uploaded_file is not None:
     image_cv = cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
     database = load_db()
     templates = load_templates()
-
-    st.write("⚙️ Wyszukuję punkty kotwiczenia i wycinam sloty...")
     
-    # DYNAMICZNE WYSZUKIWANIE WSPÓŁRZĘDNYCH
+    # 2. Cięcie slotów
     anchors = find_anchors(image_cv)
-    
     all_slots = []
     
-    # 2. Cięcie siatek
     for name, coords in anchors.items():
-        st.write(f"✅ Znaleziono **{name}** (Kotwica: X={coords['x']}, Y={coords['y']})")
+        st.caption(f"Znaleziono **{name}** (Kotwica: X={coords['x']}, Y={coords['y']})")
         all_slots.extend(process_grid(image_cv, name, coords))
         
     if not all_slots:
         st.error("Nie znaleziono siatek. Sprawdź, czy napisy są widoczne.")
         st.stop()
         
-    st.write(f"Wycięto łącznie **{len(all_slots)}** slotów do analizy.")
+    st.info(f"Wycięto łącznie **{len(all_slots)}** slotów do analizy.")
     
     # 3. Analiza (Template Matching)
     found_resources = []
-    unknown_slots_to_save = []
+    unknown_slots_data = {}
     
     for slot in all_slots:
-        item_name, confidence = match_template(slot["img"], templates)
+        slot_img = slot["img"]
+        item_name, confidence = match_template(slot_img, templates)
         
         if item_name:
-            # Znany przedmiot - dodajemy do wyników
+            # Znany przedmiot
             if item_name in database:
                  if not any(d['Przedmiot'] == item_name for d in found_resources):
                     found_resources.append({
@@ -204,59 +200,103 @@ if uploaded_file is not None:
                         "Confidence": confidence
                     })
         else:
-            # Nieznany przedmiot - dodajemy do listy do zapisania
-            unknown_slots_to_save.append(slot)
+            # Nieznany przedmiot - kodujemy i przechowujemy w st.session_state
+            b64_img = encode_template(slot_img)
             
-    # Zapisywanie nieznanych slotów
-    unknown_count = 0
-    if unknown_slots_to_save:
-        saved_histograms = set()
-        
-        for slot in unknown_slots_to_save:
-            # Tworzymy histogram (unikalny odcisk palca) dla obrazu
-            hist = cv2.calcHist([slot["img"]], [0], None, [256], [0, 256])
-            hist_tuple = tuple(hist.flatten()) 
+            # Używamy unikalnego hasha obrazu do sprawdzenia duplikatów
+            img_hash = hash(slot_img.tobytes())
             
-            if hist_tuple not in saved_histograms:
-                # Zapisujemy plik tylko, jeśli jest unikalny
-                filename = os.path.join(UNKNOWN_DIR, f"UNKNOWN_{slot['grid']}_{slot['index']}_{os.urandom(4).hex()}.png")
-                cv2.imwrite(filename, slot["img"])
-                saved_histograms.add(hist_tuple)
-                unknown_count += 1
-                
+            if img_hash not in st.session_state.get('known_hashes', set()):
+                # Unikalna nieznana ikona
+                unknown_slots_data[img_hash] = {"b64": b64_img, "grid": slot["grid"], "index": slot["index"]}
+                if 'known_hashes' not in st.session_state:
+                    st.session_state['known_hashes'] = set()
+                st.session_state['known_hashes'].add(img_hash)
+
     # --- WYNIKI ---
     st.header("Wyniki Skanowania")
     if found_resources:
         st.success(f"Znaleziono {len(found_resources)} unikalnych, znanych zasobów!")
-        
         for item in found_resources:
             color = "green" if item['Akcja'] == "TRZYMAJ" else "orange"
-            
-            with st.container():
+            with st.container(border=True):
                 st.markdown(f"### :{color}[{item['Akcja']}] {item['Przedmiot']}")
                 st.caption(f"Typ: {item['Typ']} (Siatka: {item['Slot']} | Zgodność: {item['Confidence']:.2f})")
                 st.info(item['Rada'])
-                st.divider()
     else:
         st.warning("Nie znaleziono znanych zasobów w ekwipunku.")
+
+    # --- PANEL ZARZĄDZANIA SZABLONAMI ---
     
-    if unknown_count > 0:
-         st.error(f"Zapisano {unknown_count} unikalnych, nieznanych ikon do folderu `{UNKNOWN_DIR}/`! Opisz je i przenieś do `{TEMPLATE_DIR}/`.")
-
-
-    # --- DEBUG VIEW ---
-    with st.expander("👁️ DIAGNOSTYKA I GENEROWANIE SZABLONÓW", expanded=True):
-        st.header("Instrukcja Generowania Bazy Ikon")
-        st.markdown(f"""
-        **Obrazy poniżej to CZYSTE, WYRÓWNANE IKONY gotowe do użycia jako szablony.**
-        1.  **Zobacz folder `{UNKNOWN_DIR}/`:** Znajdziesz tam nowe pliki PNG.
-        2.  **Opisz ikonę:** Jeśli ikona to np. **Chromatic Metal**, zmień nazwę pliku na **`CHROMATIC_METAL.png`**.
-        3.  **Przenieś plik:** Przenieś plik do folderu **`{TEMPLATE_DIR}/`**.
-        4.  **Odśwież aplikację:** Aplikacja załaduje nowy szablon i zacznie rozpoznawać ten przedmiot.
-        """)
+    if unknown_slots_data:
+        st.error(f"Znaleziono {len(unknown_slots_data)} unikalnych nieznanych ikon! Wymagają opisu.")
         
+        with st.expander("📝 Zarządzanie Nowymi Ikonami i Aktualizacja Bazy", expanded=True):
+            st.markdown("### Krok 1: Wprowadź Nazwy dla Nowych Ikon (WIELKIE LITERY, bez spacji)")
+            
+            # Przechowujemy dane ikon w st.session_state, aby przetrwały interakcje
+            if 'new_templates_input' not in st.session_state:
+                st.session_state['new_templates_input'] = {}
+
+            cols = st.columns(4)
+            
+            for i, (img_hash, data) in enumerate(unknown_slots_data.items()):
+                b64_img = data["b64"]
+                
+                # Wyświetlanie miniatury
+                image_bytes = base64.b64decode(b64_img)
+                image_pil = Image.open(io.BytesIO(image_bytes))
+                
+                with cols[i % 4]:
+                    st.image(image_pil, use_column_width=True, caption=f"Siatka: {data['grid']} | Index: {data['index']}")
+                    
+                    # Pole tekstowe do wprowadzania nazwy
+                    key = f"input_{img_hash}"
+                    st.session_state['new_templates_input'][key] = st.text_input(
+                        "Nazwa Ikonu (np. SODIUM)", 
+                        key=key, 
+                        value=st.session_state['new_templates_input'].get(key, "")
+                    ).strip().upper().replace(" ", "_")
+
+            st.markdown("---")
+            st.markdown("### Krok 2: Generowanie Nowej Bazy")
+            
+            if st.button("💾 Generuj Zaktualizowany templates.json"):
+                # Pobieramy obecną bazę (na wszelki wypadek, żeby nie nadpisać)
+                new_templates = load_templates()
+                
+                updates = 0
+                for key, item_name in st.session_state['new_templates_input'].items():
+                    if item_name:
+                        img_hash = key.replace("input_", "")
+                        b64_img = unknown_slots_data[img_hash]["b64"]
+                        
+                        # Sprawdzamy, czy nazwa już istnieje w bazie
+                        if item_name not in new_templates:
+                            new_templates[item_name] = b64_img
+                            updates += 1
+                
+                if updates > 0:
+                    st.success(f"Pomyślnie dodano {updates} nowych ikon do bazy! Pobierz nowy plik poniżej.")
+                    
+                    # Generowanie pliku JSON do pobrania
+                    json_data = json.dumps(new_templates, indent=4, ensure_ascii=False)
+                    st.download_button(
+                        label="Pobierz NOWY templates.json",
+                        data=json_data.encode('utf-8'),
+                        file_name=TEMPLATES_FILE,
+                        mime="application/json"
+                    )
+                    st.markdown("""
+                        **WAŻNE:** Po pobraniu pliku, **musisz go wgrać na GitHub** do głównego katalogu swojego repozytorium. Dopiero po tym aplikacja zacznie rozpoznawać nowe ikony!
+                    """)
+                else:
+                    st.warning("Nie wprowadzono nowych nazw. Wprowadź nazwy, aby wygenerować bazę.")
+    
+    # --- DEBUG VIEW ---
+    with st.expander("👁️ DIAGNOSTYKA (Wycinki do Template Matching)", expanded=True):
         if all_slots:
-            st.subheader("Wycinki pierwszych 16 slotów (pełne ikony w skali szarości z wyrównanym kontrastem)")
+            st.subheader("Wycinki pierwszych 16 slotów (gotowe do TM)")
             
             slots_to_display = [cv2.cvtColor(slot['img'], cv2.COLOR_GRAY2BGR) for slot in all_slots[:16]]
             
@@ -264,6 +304,6 @@ if uploaded_file is not None:
                 row1 = np.hstack(slots_to_display[:8])
                 row2 = np.hstack(slots_to_display[8:16])
                 combined_slots = np.vstack([row1, row2])
-                st.image(combined_slots, caption="Wycinki pierwszych 16 slotów (muszą być wyraźne!)", clamp=True)
+                st.image(combined_slots, caption="Wycinki slotów (skala szarości, wyrównany kontrast)", clamp=True)
             elif slots_to_display:
                  st.image(np.hstack(slots_to_display), caption="Wycinki slotów", clamp=True)
